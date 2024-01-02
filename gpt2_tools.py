@@ -2,7 +2,7 @@ import torch
 from transformers import GPT2Tokenizer, GPT2LMHeadModel, set_seed
 
 
-class LLM_Tools:
+class LLM_Tool:
 	def __init__(self, model='gpt2', seed=-1):
 		self.model = GPT2LMHeadModel.from_pretrained(model)
 		self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
@@ -107,7 +107,7 @@ class LLM_Tools:
 
 
 if __name__ == '__main__':
-	tool = LLM_Tools()
+	tool = LLM_Tool()
 	text = "This is a text."
 	tokens = tool.get_tokenizer().encode(text, return_tensors='pt')
 	print(tool.get_text_surprisal(tokens))

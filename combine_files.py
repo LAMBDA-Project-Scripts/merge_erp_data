@@ -1,6 +1,7 @@
 import os
 import re
 from dataclasses import dataclass
+from gpt2_tools import LLM_Tool
 from openpyxl import load_workbook
 
 
@@ -19,6 +20,8 @@ class Record:
 if __name__ == '__main__':
 	# Data that will be put together from multiple sources
 	worksheet_data = []
+	# GPT-2 measures
+	llmtool = LLM_Tool()
 
 	# First, read data from the worksheet.
 	source_excel = os.path.join('src', 'Items_final_all_22_11_2022.xlsx')
@@ -41,17 +44,22 @@ if __name__ == '__main__':
 				surprisal_text = surprisal_text.replace(character, ' ')
 			# Finally, collapse all multiple spaces into a single one
 			surprisal_text = ' '.join(surprisal_text.split())
-			
+
 			# Now, the codes in column B
 			lex = code[0:-5]
 			second_code = code[-5]
 			cond_pos = code[-4:-1]
 			fourth_code = code[-1:]
+			
+			# Finally, surprisal for the input text
+			tokens = llmtool.get_tokenizer().encode(surprisal_text, return_tensors='pt')
+			surprisal = llmtool.get_text_surprisal(tokens)
+
 			worksheet_data.append(Record(text=surprisal_text,
 			                             lex=lex,
 			                             condition=cond_pos,
 			                             animacy=None,
-			                             surprisal=None,
+			                             surprisal=surprisal,
 			                             group=None,
 			                             ambiguity=None
 			                             ))
