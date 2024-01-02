@@ -95,8 +95,41 @@ if __name__ == '__main__':
 			fields = re.split(' |\t', line.strip())
 			assert fields[1] == worksheet_data[idx].lex, \
 			       "Data field 'lex' is not properly paired"
-			group = '_'.join(fields[0:-2])
-			ambig = fields[0].split('_')[-2]
+			cond_data = fields[0].split('_')
+			group = '_'.join(cond_data[0:-2])
+			ambig = cond_data[-2]
 			worksheet_data[idx].group = group
 			# We convert 'amb/unamb' into 'ambig/unambig'
 			worksheet_data[idx].ambiguity = ambig + 'ig'
+
+	# Final check: all data has been filled for all fields
+	keys_to_record = dict()
+	for record in worksheet_data:
+		assert record.text is not None and len(record.text) > 0, "Text is missing"
+		assert record.lex is not None and len(record.lex) > 0, "Lex is missing"
+		assert record.condition is not None and len(record.condition) > 0, "Condition is missing"
+		assert record.animacy is not None and len(record.animacy) > 0, "Animacy is missing"
+		assert record.surprisal is not None and record.surprisal > 0, "Surprisal is missing"
+		assert record.group is not None and len(record.group) > 0, "Group is missing"
+		assert record.ambiguity is not None and len(record.ambiguity) > 0, "Ambiguity is missing"
+		# The key is (subject, group, ambiguity)
+		key = ('S' + record.lex, record.group, record.ambiguity)
+		keys_to_record[key] = (record.animacy, record.surprisal, 0)
+	# Unify all data
+	proref_data_filename = os.path.join('src', 
+	                                    'information__factor_coding',
+	                                    'proref_erp_data_structure_example.txt')
+	outfile = 'output.txt'
+	first = True
+	with open(proref_data_filename, 'r') as in_fp:
+		with open(outfile, 'w') as out_fp:
+			for line in in_fp:
+				if first:
+					print(line, file=out_fp)
+					first = False
+				else:
+					fields = line.split('\t')
+					# The key is (subject, group, ambiguity)
+					key = (fields[4], fields[5], fields[6])
+					record = keys_to_record[key]
+					print('\t'.join([line.strip(), record[0], str(record[1]), str(record[2])]), file=out_fp)
