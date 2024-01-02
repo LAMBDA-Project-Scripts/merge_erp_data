@@ -3,7 +3,8 @@ import re
 from dataclasses import dataclass
 from openpyxl import load_workbook
 
-# Object representing all the information we want to collect
+
+# Class representing all the information we want to collect
 @dataclass
 class Record:
     text : str
