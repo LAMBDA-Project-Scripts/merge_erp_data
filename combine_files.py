@@ -12,6 +12,8 @@ class Record:
     condition : str
     animacy : str
     surprisal : float
+    group : str
+    ambiguity : str
 
 
 if __name__ == '__main__':
@@ -49,7 +51,10 @@ if __name__ == '__main__':
 			                             lex=lex,
 			                             condition=cond_pos,
 			                             animacy=None,
-			                             surprisal=None))
+			                             surprisal=None,
+			                             group=None,
+			                             ambiguity=None
+			                             ))
 	assert len(worksheet_data) == 480, "Not enough data was read properly"
 
 	# We now read the animacy data and put it together with the data
@@ -64,8 +69,26 @@ if __name__ == '__main__':
 			# Read the animacy data from the animacy text file,
 			# performing first some data quality checks
 			fields = re.split(' |\t', line.strip())
-			assert fields[0] == worksheet_data[idx].lex, "Data field 'lex' is not properly paired"
-			assert fields[1] == worksheet_data[idx].condition, "Data field 'condition' is not properly paired"
+			assert fields[0] == worksheet_data[idx].lex, \
+			       "Data field 'lex' is not properly paired"
+			assert fields[1] == worksheet_data[idx].condition, \
+			       "Data field 'condition' is not properly paired"
 			# Update the value of the 'animacy' field
 			worksheet_data[idx].animacy = fields[2]
-			print(worksheet_data[idx])
+
+	# Next is the data regarding ambiguity and subgroups
+	structure_pattern_filename = os.path.join('src',
+									          'information__factor_coding',
+									          'structure_pattern_lex_condition.txt')
+	with open(structure_pattern_filename, 'r') as fp:
+		# Skip the header
+		next(fp)
+		for idx, line in enumerate(fp):
+			fields = re.split(' |\t', line.strip())
+			assert fields[1] == worksheet_data[idx].lex, \
+			       "Data field 'lex' is not properly paired"
+			group = '_'.join(fields[0:-2])
+			ambig = fields[0].split('_')[-2]
+			worksheet_data[idx].group = group
+			# We convert 'amb/unamb' into 'ambig/unambig'
+			worksheet_data[idx].ambiguity = ambig + 'ig'
