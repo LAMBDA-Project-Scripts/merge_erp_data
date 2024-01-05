@@ -15,6 +15,7 @@ class Record:
     surprisal : float
     group : str
     ambiguity : str
+    ref_judgement : str
 
 
 if __name__ == '__main__':
@@ -49,7 +50,7 @@ if __name__ == '__main__':
 			lex = code[0:-5]
 			second_code = code[-5]
 			cond_pos = code[-4:-1]
-			fourth_code = code[-1:]
+			behavioral_response = code[-1:]
 			
 			# Finally, surprisal for the input text
 			tokens = llmtool.get_tokenizer().encode(surprisal_text, return_tensors='pt')
@@ -61,7 +62,8 @@ if __name__ == '__main__':
 			                             animacy=None,
 			                             surprisal=surprisal,
 			                             group=None,
-			                             ambiguity=None
+			                             ambiguity=None,
+			                             ref_judgement=behavioral_response  # <- Is this correct?
 			                             ))
 	assert len(worksheet_data) == 480, "Not enough data was read properly"
 
@@ -112,9 +114,10 @@ if __name__ == '__main__':
 		assert record.surprisal is not None and record.surprisal > 0, "Surprisal is missing"
 		assert record.group is not None and len(record.group) > 0, "Group is missing"
 		assert record.ambiguity is not None and len(record.ambiguity) > 0, "Ambiguity is missing"
+		assert record.ref_judgement is not None and len(record.ref_judgement) > 0, "Ambiguity is missing"
 		# The key is (subject, group, ambiguity)
 		key = ('S' + record.lex, record.group, record.ambiguity)
-		keys_to_record[key] = (record.animacy, record.surprisal, 0)
+		keys_to_record[key] = (record.animacy, record.surprisal, record.ref_judgement)
 	# Unify all data
 	proref_data_filename = os.path.join('src', 
 	                                    'information__factor_coding',
@@ -132,4 +135,4 @@ if __name__ == '__main__':
 					# The key is (subject, group, ambiguity)
 					key = (fields[4], fields[5], fields[6])
 					record = keys_to_record[key]
-					print('\t'.join([line.strip(), record[0], str(record[1]), str(record[2])]), file=out_fp)
+					print('\t'.join([line.strip(), record[0], str(record[1]), record[2]]), file=out_fp)
