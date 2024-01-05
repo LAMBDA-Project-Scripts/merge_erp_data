@@ -21,11 +21,20 @@ class Record:
 if __name__ == '__main__':
 	# Data that will be put together from multiple sources
 	worksheet_data = []
+	# All sources of data
+	source_excel = os.path.join('data', 'Items_final_all_22_11_2022.xlsx')
+	animacy_filename = os.path.join('src',
+									'proref_condition_coding_itemlist_fixed.txt')
+	structure_pattern_filename = os.path.join('data',
+									          'structure_pattern_lex_condition.txt')
+	proref_data_filename = os.path.join('data', 
+	                                    'proref_erp_data_structure_example.txt')
+	outfile = 'results.csv'
+
 	# GPT-2 measures
 	llmtool = LLM_Tool()
 
 	# First, read data from the worksheet.
-	source_excel = os.path.join('src', 'Items_final_all_22_11_2022.xlsx')
 	workbook = load_workbook(filename=source_excel)
 	worksheet = workbook['Items_all_corrct']
 
@@ -69,9 +78,6 @@ if __name__ == '__main__':
 
 	# We now read the animacy data and put it together with the data
 	# we collected from the spreadsheet
-	animacy_filename = os.path.join('src',
-									'information__factor_coding',
-									'proref_condition_coding_itemlist_fixed.txt')
 	with open(animacy_filename, 'r') as fp:
 		# Skip the header
 		next(fp)
@@ -84,12 +90,11 @@ if __name__ == '__main__':
 			assert fields[1] == worksheet_data[idx].condition, \
 			       "Data field 'condition' is not properly paired"
 			# Update the value of the 'animacy' field
-			worksheet_data[idx].animacy = fields[2]
+			assert fields[2] in {'i', 'a'}, \
+					"Data field 'animacy' has an invalid value"
+			worksheet_data[idx].animacy = 1 if fields[2] == 'a' else 0
 
 	# Next is the data regarding ambiguity and subgroups
-	structure_pattern_filename = os.path.join('src',
-									          'information__factor_coding',
-									          'structure_pattern_lex_condition.txt')
 	with open(structure_pattern_filename, 'r') as fp:
 		# Skip the header
 		next(fp)
@@ -110,19 +115,15 @@ if __name__ == '__main__':
 		assert record.text is not None and len(record.text) > 0, "Text is missing"
 		assert record.lex is not None and len(record.lex) > 0, "Lex is missing"
 		assert record.condition is not None and len(record.condition) > 0, "Condition is missing"
-		assert record.animacy is not None and len(record.animacy) > 0, "Animacy is missing"
+		assert record.animacy is not None and record.animacy < 2, "Animacy is missing"
 		assert record.surprisal is not None and record.surprisal > 0, "Surprisal is missing"
 		assert record.group is not None and len(record.group) > 0, "Group is missing"
 		assert record.ambiguity is not None and len(record.ambiguity) > 0, "Ambiguity is missing"
-		assert record.ref_judgement is not None and len(record.ref_judgement) > 0, "Ambiguity is missing"
+		assert record.ref_judgement is not None and len(record.ref_judgement) > 0, "Referential judgement is missing"
 		# The key is (subject, group, ambiguity)
 		key = ('S' + record.lex, record.group, record.ambiguity)
 		keys_to_record[key] = (record.animacy, record.surprisal, record.ref_judgement)
 	# Unify all data
-	proref_data_filename = os.path.join('src', 
-	                                    'information__factor_coding',
-	                                    'proref_erp_data_structure_example.txt')
-	outfile = 'output.txt'
 	first = True
 	with open(proref_data_filename, 'r') as in_fp:
 		with open(outfile, 'w') as out_fp:
@@ -135,4 +136,4 @@ if __name__ == '__main__':
 					# The key is (subject, group, ambiguity)
 					key = (fields[4], fields[5], fields[6])
 					record = keys_to_record[key]
-					print('\t'.join([line.strip(), record[0], str(record[1]), record[2]]), file=out_fp)
+					print('\t'.join([line.strip(), str(record[0]), str(record[1]), record[2]]), file=out_fp)
