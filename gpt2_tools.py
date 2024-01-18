@@ -103,7 +103,8 @@ class LLM_Tool:
 			prev_end_loc = end_loc
 			if end_loc == seq_len:
 				break
-		return torch.exp(torch.stack(nlls).mean()).item()
+		# Is this correct for surprisal?
+		return torch.stack(nlls).mean().item()
 
 
 if __name__ == '__main__':

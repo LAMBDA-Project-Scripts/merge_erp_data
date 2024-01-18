@@ -3,6 +3,7 @@ import re
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from gpt2_tools import LLM_Tool
 from openpyxl import load_workbook
 
@@ -16,9 +17,78 @@ class Record:
     condition : str
     animacy : str
     surprisal : float
+    perplexity : float
     group : str
     ambiguity : str
     ref_judgement : str
+
+    def is_consistent(self, allow_missing=None):
+        """Checks consistency for a specific record.
+
+        Parameters
+        ----------
+        allow_missing : list(str)
+            List of fields that we allow to be inconsistent.
+        """
+        if "text" not in allow_missing:
+            assert self.text is not None and len(self.text) > 0, \
+                "Text is missing"
+        if "full_id" not in allow_missing:
+            assert self.full_id is not None and len(self.full_id) > 0, \
+                "Full_id is missing"
+        if "lex" not in allow_missing:
+            assert self.lex is not None and len(self.lex) > 0, \
+                "Lex is missing"
+        if "condition" not in allow_missing:
+            assert self.condition is not None and len(self.condition) > 0, \
+                "Condition is missing"
+        if "animacy" not in allow_missing:
+            assert self.animacy is not None and self.animacy < 2, \
+                "Animacy is missing"
+        if "surprisal" not in allow_missing:
+            assert self.surprisal is not None and self.surprisal > 0, \
+                "Surprisal is missing"
+        if "perplexity" not in allow_missing:
+            assert self.perplexity is not None and self.perplexity > 0, \
+                "Perplexity is missing"
+        if "group" not in allow_missing:
+            assert self.group is not None and len(self.group) > 0, \
+                "Group is missing"
+        if "ambiguity" not in self.ambiguity:
+            assert self.ambiguity is not None and len(self.ambiguity) > 0, \
+                "Ambiguity is missing"
+        if "ref_judgement" not in allow_missing:
+            assert self.ref_judgement is not None and \
+                isinstance(self.ref_judgement, Antecedent), \
+                "Referential judgement is missing"
+		
+
+class Antecedent(Enum):
+	FIRST = 1
+	SECOND = 2
+	BOTH = 3
+
+
+def calculate_antecedent(first_val, second_val):
+	assert 1<=first_val<=5, f"Invalid value {first_val} for first_val"
+	assert 1<=second_val<=5, f"Invalid value {second_val} for second_val"
+	values = {(1,3): Antecedent.FIRST,
+			  (1,4): Antecedent.FIRST,
+			  (1,5): Antecedent.FIRST,
+			  (2,4): Antecedent.FIRST,
+			  (2,5): Antecedent.FIRST,
+			  (3,1): Antecedent.SECOND,
+			  (3,2): Antecedent.SECOND, # This doesn't hold up there
+			  (3,5): Antecedent.FIRST,
+			  (4,1): Antecedent.SECOND,
+			  (4,2): Antecedent.SECOND,
+			  (5,1): Antecedent.SECOND,
+			  (5,2): Antecedent.SECOND,
+			  (5,3): Antecedent.SECOND}
+	try:
+		return values[(first_val, second_val)]
+	except KeyError:
+		return Antecedent.BOTH
 
 
 if __name__ == '__main__':
@@ -69,6 +139,7 @@ if __name__ == '__main__':
 			# Finally, surprisal for the input text
 			tokens = llmtool.get_tokenizer().encode(surprisal_text, return_tensors='pt')
 			surprisal = llmtool.get_text_surprisal(tokens)
+			perplexity = llmtool.get_text_perplexity(tokens)
 
 			worksheet_data.append(Record(text=surprisal_text,
 			                             full_id=code,
@@ -76,6 +147,7 @@ if __name__ == '__main__':
 			                             condition=cond_pos,
 			                             animacy=None,
 			                             surprisal=surprisal,
+			                             perplexity=perplexity,
 			                             group=None,
 			                             ambiguity=None,
 			                             ref_judgement=None
@@ -140,28 +212,24 @@ if __name__ == '__main__':
 		try:
 			mean_rating1 = statistics.mean(proref_item_to_rating[(int(record.full_id[:-1]), 1)])
 			mean_rating2 = statistics.mean(proref_item_to_rating[(int(record.full_id[:-1]), 2)])
-			record.ref_judgement = mean_rating1 + mean_rating2
+			record.ref_judgement = calculate_antecedent(round(mean_rating1), round(mean_rating2))
 		except statistics.StatisticsError:
 			pass
 
 	# Final check: all data has been filled for all fields
 	keys_to_record = dict()
 	for record in worksheet_data:
-		assert record.text is not None and len(record.text) > 0, "Text is missing"
-		assert record.full_id is not None and len(record.full_id) > 0, "Full_id is missing"
-		assert record.lex is not None and len(record.lex) > 0, "Lex is missing"
-		assert record.condition is not None and len(record.condition) > 0, "Condition is missing"
-		assert record.animacy is not None and record.animacy < 2, "Animacy is missing"
-		assert record.surprisal is not None and record.surprisal > 0, "Surprisal is missing"
-		assert record.group is not None and len(record.group) > 0, "Group is missing"
-		assert record.ambiguity is not None and len(record.ambiguity) > 0, "Ambiguity is missing"
-		# The key is (subject, group, ambiguity)
+		# Check that the record is consistent, except for ref_judgement
+		# which we know can be missing
+		record.is_consistent(allow_missing=["ref_judgement"])
+		# The key we use is (subject, group, ambiguity)
 		key = ('S' + record.lex, record.group, record.ambiguity)
-		try:
-			assert record.ref_judgement is not None and record.ref_judgement > 0, "Referential judgement is missing"
-			keys_to_record[key] = (record.animacy, record.surprisal, record.ref_judgement)
-		except AssertionError:
-			keys_to_record[key] = (record.animacy, record.surprisal, 'N/A')
+		if record.ref_judgement is not None and isinstance(record.ref_judgement, Antecedent):
+			# We have a referential judgement value
+			keys_to_record[key] = (record.animacy, record.surprisal, record.perplexity, record.ref_judgement.name)
+		else:
+			# We don't have a referential judgement value
+			keys_to_record[key] = (record.animacy, record.surprisal, record.perplexity, 'N/A')
 		
 	# Unify all data
 	first = True
@@ -176,4 +244,4 @@ if __name__ == '__main__':
 					# The key is (subject, group, ambiguity)
 					key = (fields[4], fields[5], fields[6])
 					record = keys_to_record[key]
-					print('\t'.join([line.strip(), str(record[0]), str(record[1]), str(record[2])]), file=out_fp)
+					print('\t'.join([line.strip(), str(record[0]), str(record[1]), str(record[2]), str(record[3])]), file=out_fp)
